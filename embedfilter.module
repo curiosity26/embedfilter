@@ -1,0 +1,65 @@
+<?php
+/**
+* @file
+* A description of what your module does.
+*/
+
+/**
+ * Implements hook_filter_info().
+ */
+function embedfilter_filter_info() {
+  return array(
+    'embed_filter' => array(
+      'title' => t('Embeded Content Tokens'),
+      'description' =>
+        t('Embed exiting content using a special token'),
+      'process callback' => 'embedfilter_filter_process',
+      'tips callback' => 'embedfilter_filter_tips'
+    )
+  );
+}
+
+function embedfilter_filter_process($text, $filter, $format, $langcode, $cache, $cache_id) {
+  $matches = array();
+  if (preg_match_all('/\[\[(?<content_type>[^:]+):(?<node_id>[\d]+)(?:\sdisplay=(?<view_mode>[^\]]+))?\]\]/', $text, $matches) != FALSE) {
+    $finds = $matches[0];
+    foreach($finds as $i => $find) {
+      $content_type = $matches['content_type'][$i];
+      $nid = $matches['node_id'][$i];
+      $view_mode = $matches['view_mode'][$i] != FALSE ? $matches['view_mode'][$i] : 'full';
+      $node = node_load($nid);
+      if ($node->type == $content_type) {
+        $view = node_view($node, $view_mode);
+        $output = render($view);
+        $text = str_replace($find, $output, $text);
+      }
+    }
+  }
+  return $text;
+}
+
+function embedfilter_filter_tips($filter, $format, $long = FALSE) {
+  if ($long) {
+    return t('Embed exiting content using the format [[content_type:node_id display=display_mode]] where the content_type is an existing content type, such as "article" or "page", node_id is the id of the existing node. The display attributes is optional and always defaults to "full" but any content display format name can be used.');
+  }
+  return t('Embed exiting content using special tokens');
+}
+
+function embedfilter_form_alter(&$form, $form_state, $form_id) {
+  if (isset($form['#node']) && ($node = $form['#node']) !== FALSE
+    && $form_id == $form['#node']->type . '_node_form'
+    && isset($node->type) && isset($node->nid)) {
+    $token = "[[{$node->type}:{$node->nid} display=full]]";
+    $info = $entity_info = entity_get_info('node');
+    $modes = implode(', ', array_keys($info['view modes']));
+    $form['embed_token'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Embed Token'),
+      '#default_value' => $token,
+      '#description' => t('Available display modes: %modes', array(
+        '%modes' => $modes
+      )),
+      '#attributes' => array('readonly' => 'readonly')
+    );
+  }
+}

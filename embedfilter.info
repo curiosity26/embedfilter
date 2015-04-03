@@ -1,0 +1,3 @@
+name = Embedfilter
+description = Parses a special token from text formats to embed existing content
+core = 7.x
